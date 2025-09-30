@@ -133,7 +133,7 @@ with DAG(
     dag_id="load_csv_to_postgres_dag",
     description="Download CSV from Supabase and load into PostgreSQL",
     start_date=datetime(2025, 9, 30),
-    schedule_interval=None,  # Trigger manually or via API
+    schedule=None,  # Trigger manually or via API
     catchup=False,
     tags=["csv", "postgres", "supabase"],
 ) as dag:
@@ -141,7 +141,6 @@ with DAG(
     load_csv_task = PythonOperator(
         task_id="download_and_load_csv",
         python_callable=download_and_load_csv,
-        provide_context=True,
         params={
             "storage_path": Param(
                 default="https://gzawhludfyspekqesqgv.supabase.co/storage/v1/object/sign/dhruv-new/uploads/2025/09/25/dhruvanand2617_gmail.com/retail_sales_dataset.csv?token=EXAMPLE",
