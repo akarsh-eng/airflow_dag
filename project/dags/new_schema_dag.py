@@ -22,10 +22,10 @@ load_dotenv()
 #     "schema": Variable.get("supabase_schema", default_var="your_schema"),
 #     "table_name": Variable.get("supabase_table_name", default_var="your_table")
 # }
-DAG_INPUT = {
-    "schema": "dhruv-new",
-    "table_name":"retail_sales_dataset"
-}
+# DAG_INPUT = {
+#     "schema": "dhruv-new",
+#     "table_name":"retail_sales_dataset"
+# }
 
 
 # Supabase environment variables (set these in Airflow or your env)
@@ -34,11 +34,11 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY","")
 # SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 
 # Postgres connection parameters (set these in Airflow Variables or env)
-PG_HOST = os.getenv("SUPABASE_HOST", "aws-1-us-east-1.pooler.supabase.com")
-PG_DB = os.getenv("POSTGRES_DATABASE", "postgres")
-PG_USER = os.getenv("SUPABASE_USER", "postgres.gzawhludfyspekqesqgv")
-PG_PASSWORD = os.getenv("POSTGRES_PASSWORD", "tECW6ganq2cAh2ik")
-PG_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+PG_HOST = os.getenv("SUPABASE_HOST")
+PG_DB = os.getenv("POSTGRES_DATABASE")
+PG_USER = os.getenv("SUPABASE_USER")
+PG_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+PG_PORT = int(os.getenv("POSTGRES_PORT"))
 
 default_args = {
     'owner': 'airflow',
@@ -53,11 +53,20 @@ with DAG(
     schedule=None,
     catchup=False,
     tags=["supabase", "private", "etl", "streaming"],
+    params={
+        "schema": "dhruv-new",
+        "table_name": "retail_sales_dataset",
+    },
 ) as dag:
 
     def fetch_metadata(**context):
-        schema = DAG_INPUT["schema"]
-        table_name = DAG_INPUT["table_name"]
+        # Prefer values passed when triggering the DAG (dag_run.conf via UI/CLI),
+        # then fall back to DAG params, then environment variables.
+        dag_run = context.get("dag_run")
+        run_conf = getattr(dag_run, "conf", {}) if dag_run else {}
+        params = context.get("params", {})
+        schema = run_conf.get("schema") or params.get("schema") or os.getenv("SUPABASE_SCHEMA", "dhruv-new")
+        table_name = run_conf.get("table_name") or params.get("table_name") or os.getenv("SUPABASE_TABLE", "retail_sales_dataset")
 
         conn = psycopg2.connect(
             host=PG_HOST,
@@ -98,8 +107,11 @@ with DAG(
             conn.close()
 
     def drop_disabled_columns(**context):
-        schema = DAG_INPUT["schema"]
-        table_name = DAG_INPUT["table_name"]
+        dag_run = context.get("dag_run")
+        run_conf = getattr(dag_run, "conf", {}) if dag_run else {}
+        params = context.get("params", {})
+        schema = run_conf.get("schema") or params.get("schema") or os.getenv("SUPABASE_SCHEMA", "dhruv-new")
+        table_name = run_conf.get("table_name") or params.get("table_name") or os.getenv("SUPABASE_TABLE", "retail_sales_dataset")
         metadata_table = context['ti'].xcom_pull(key='metadata_table', task_ids='fetch_metadata')
         print("Metadata Table:", metadata_table)
 
@@ -133,8 +145,11 @@ with DAG(
             conn.close()
 
     def load_data_stream(**context):
-        schema = DAG_INPUT["schema"]
-        table_name = DAG_INPUT["table_name"]
+        dag_run = context.get("dag_run")
+        run_conf = getattr(dag_run, "conf", {}) if dag_run else {}
+        params = context.get("params", {})
+        schema = run_conf.get("schema") or params.get("schema") or os.getenv("SUPABASE_SCHEMA", "dhruv-new")
+        table_name = run_conf.get("table_name") or params.get("table_name") or os.getenv("SUPABASE_TABLE", "retail_sales_dataset")
         storage_path = context['ti'].xcom_pull(key='storage_path', task_ids='fetch_metadata')
         disabled_cols = context['ti'].xcom_pull(key='disabled_cols', task_ids='drop_disabled_columns')
         print(type(disabled_cols), disabled_cols, "Disabled Columns")
@@ -166,7 +181,7 @@ with DAG(
                 chunk.to_csv(csv_buffer, index=False, header=False)
                 csv_buffer.seek(0)
 
-                full_table = f'"{schema}"."{table_name}_try"'
+                full_table = f'"{schema}"."{table_name}"'
 
                 cur.execute(f"TRUNCATE TABLE {full_table};")
 
