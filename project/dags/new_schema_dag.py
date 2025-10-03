@@ -38,7 +38,7 @@ PG_HOST = os.getenv("SUPABASE_HOST")
 PG_DB = os.getenv("POSTGRES_DATABASE")
 PG_USER = os.getenv("SUPABASE_USER")
 PG_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-PG_PORT = int(os.getenv("POSTGRES_PORT"))
+PG_PORT = os.getenv("POSTGRES_PORT")
 
 default_args = {
     'owner': 'airflow',
